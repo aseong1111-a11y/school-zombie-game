@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>학교 생존 게임 - Firebase 멀티플레이</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#101522;color:#eef3ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}button,input{font:inherit}button{cursor:pointer;border:0;border-radius:10px;padding:11px 15px;background:#4f7cff;color:white;font-weight:700}button.secondary{background:#29344d}button.warn{background:#c95151}.hidden{display:none!important}
+#app{height:100%;display:grid;place-items:center}.screen{width:min(1180px,100vw);height:min(760px,100vh);position:relative}.panel{background:#182136;border:1px solid #34415f;border-radius:18px;box-shadow:0 18px 50px #0008}.menu{width:min(720px,94vw);padding:30px;margin:auto}.title{font-size:38px;font-weight:900;letter-spacing:-2px}.sub{color:#9eabc7;margin:7px 0 22px}.row{display:flex;gap:9px;flex-wrap:wrap}.input{background:#0e1524;color:#fff;border:1px solid #3b4967;border-radius:10px;padding:11px 12px;outline:none}.input:focus{border-color:#7ea0ff}.notice{min-height:24px;color:#ffd36e;margin-top:12px}.small{font-size:12px;color:#9eabc7}.room-list{margin-top:18px;max-height:230px;overflow:auto}.room{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#101827;border:1px solid #2d3953;border-radius:12px;margin:7px 0}.room b{display:block}.room span{font-size:12px;color:#9eabc7}
+#game{background:#101522}.game-wrap{width:100%;height:100%;position:relative;overflow:hidden;background:#0a0f18}.game-canvas{display:block;width:100%;height:100%;image-rendering:pixelated}.hud{position:absolute;left:12px;top:12px;display:flex;gap:7px;flex-wrap:wrap;max-width:75%;pointer-events:none}.badge{background:#101827dd;border:1px solid #44516d;border-radius:9px;padding:7px 10px;font-size:13px}.map{position:absolute;right:12px;top:12px;width:170px;padding:9px;background:#101827dd;border:1px solid #44516d;border-radius:10px}.map-title{font-size:11px;color:#aeb9d0;margin-bottom:6px}.floor-row{display:grid;grid-template-columns:28px repeat(3,1fr);gap:3px;margin:3px 0}.floor-row i,.room-cell{height:16px;background:#2b354d;border-radius:3px}.floor-row i{background:none;font-size:9px;font-style:normal;color:#8794b0;text-align:center}.room-cell.on{background:#7da0ff}.room-cell.you{outline:2px solid #fff}.inventory{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px}.slot{width:48px;height:45px;border-radius:7px;border:1px solid #46536e;background:#111a2bde;position:relative;text-align:center;padding-top:12px}.slot b{font-size:18px}.slot span{position:absolute;bottom:2px;left:0;right:0;font-size:7px;color:#c8d1e6}.prompt{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);background:#101827ed;border:1px solid #61708d;border-radius:10px;padding:9px 13px;font-size:13px}.touch{position:absolute;left:12px;bottom:70px;display:grid;grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px;gap:4px}.touch button{padding:0;background:#1a2740cc;border:1px solid #566582}.touch .up{grid-column:2}.touch .down{grid-column:2}.actions{position:absolute;right:14px;bottom:72px;display:flex;gap:7px}.actions button{background:#1a2740cc;border:1px solid #566582}.shade{position:absolute;inset:0;pointer-events:none}.toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:9px 13px;border-radius:9px;background:#101827ee;border:1px solid #52627f;opacity:0;transition:.2s}.toast.show{opacity:1}.lobby{width:min(720px,94vw);padding:24px;margin:auto}.players{margin:16px 0}.player{display:flex;justify-content:space-between;padding:9px 11px;background:#101827;border-radius:8px;margin:5px 0}.tag{font-size:11px;color:#9eabc7}.firebase-state{margin-top:8px;font-size:12px;color:#7fe0a3}
+@media(max-width:700px){.title{font-size:28px}.map{width:135px}.badge{font-size:11px;padding:6px 8px}.slot{width:39px;height:40px}.touch{bottom:60px}.actions{bottom:60px}.prompt{bottom:110px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="menu" class="screen" style="display:grid;place-items:center">
+    <div class="panel menu">
+      <div class="title">학교 생존 게임</div>
+      <div class="sub">5층 학교 · 생존자 vs 좀비 · Firebase 멀티플레이 프로토타입</div>
+      <div class="row">
+        <button id="createBtn">방 만들기</button>
+        <button id="joinBtn" class="secondary">방 번호로 입장</button>
+        <button id="randomBtn" class="secondary">랜덤 매칭</button>
+        <button id="aiBtn" class="secondary">AI 방</button>
+      </div>
+      <div id="joinBox" class="hidden" style="margin-top:15px"><input id="roomCode" class="input" maxlength="6" placeholder="6자리 방 번호"><button id="joinCodeBtn">입장</button></div>
+      <div id="roomList" class="room-list"></div>
+      <div id="menuNotice" class="notice"></div>
+      <div class="small">Firebase 설정 전에도 혼자 테스트할 수 있지만, 실제 방 공유는 Firebase 설정이 필요합니다.</div>
+      <div id="firebaseState" class="firebase-state">Firebase: 연결 준비 중</div><div class="small" style="margin-top:6px">연결 성공 시 이 문구가 "Firebase: 연결됨 · 익명 로그인 완료"로 바뀝니다.</div>
+    </div>
+  </section>
+
+  <section id="lobby" class="screen hidden" style="display:grid;place-items:center">
+    <div class="panel lobby">
+      <h2 style="margin-top:0">대기실</h2>
+      <div id="lobbyInfo"></div>
+      <div class="players" id="players"></div>
+      <div class="row"><button id="startBtn">게임 시작</button><button id="leaveBtn" class="secondary">방 나가기</button></div>
+      <div id="lobbyNotice" class="notice"></div>
+    </div>
+  </section>
+
+  <section id="game" class="screen hidden">
+    <div class="game-wrap">
+      <canvas id="canvas" class="game-canvas" width="1152" height="648"></canvas>
+      <div class="hud">
+        <div class="badge" id="roleBadge">역할</div><div class="badge" id="floorBadge">1층</div><div class="badge" id="hpBadge">HP 100</div><div class="badge" id="keyBadge">열쇠 0/10</div><div class="badge" id="timeBadge">낮</div>
+      </div>
+      <div class="map"><div class="map-title">학교 위치</div><div id="minimap"></div></div>
+      <div class="inventory" id="inventory"></div>
+      <div class="prompt" id="prompt">WASD/방향키로 이동 · E로 상호작용</div>
+      <div class="touch"><button class="up" data-key="ArrowUp">▲</button><button data-key="ArrowLeft">◀</button><button data-key="ArrowRight">▶</button><button class="down" data-key="ArrowDown">▼</button></div>
+      <div class="actions"><button id="interactBtn">E 상호작용</button><button id="exitGameBtn" class="warn">나가기</button></div>
+      <div class="toast" id="toast"></div><div class="shade" id="shade"></div>
+    </div>
+  </section>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<script>
+/* =========================
+   1. FIREBASE 설정
+   =========================
+   Firebase 콘솔에서 웹 앱을 등록한 뒤 아래 5개 값을 교체하세요.
+*/
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCmEtlb2dOIydoTgDz7BG3POwVcm-UxE0",
+  authDomain: "zomb-b79a7.firebaseapp.com",
+  projectId: "zomb-b79a7",
+  storageBucket: "zomb-b79a7.firebasestorage.app",
+  messagingSenderId: "932770219687",
+  appId: "1:932770219687:web:b423648ba322feb4cefd82",
+  measurementId: "G-DHN9WR57SM"
+};
+
+let firebaseReady=false, db=null, auth=null, me=null, roomId=null, unsubRoom=null, unsubPlayers=null;
+const localMode = FIREBASE_CONFIG.apiKey.startsWith("여기에_");
+
+function $(id){return document.getElementById(id)}
+function notice(s){$("menuNotice").textContent=s}
+function lobbyNotice(s){$("lobbyNotice").textContent=s}
+function show(id){["menu","lobby","game"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+function randomCode(){return String(Math.floor(100000+Math.random()*900000))}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function now(){return Date.now()}
+
+if(!localMode){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG); auth=firebase.auth(); db=firebase.firestore();
+    auth.signInAnonymously().then(c=>{me=c.user;firebaseReady=true;$("firebaseState").textContent="Firebase: 연결됨 · 익명 로그인 완료";}).catch(e=>$("firebaseState").textContent="Firebase 로그인 오류: "+e.message);
+  }catch(e){$("firebaseState").textContent="Firebase 초기화 오류: "+e.message;console.error(e)}
+}else $("firebaseState").textContent="Firebase: 설정 전 · 로컬 테스트 모드";
+
+const state={
+  mode:"menu", role:null, room:null, floor:1, roomNo:2, x:576,y:360,hp:100, keys:0, phase:"day", startedAt:0,
+  inventory:{umbrella:false,medicine:false,antidote:false}, hulk:false, alive:true, respawnAt:0,
+  players:{}, objects:[], lastSync:0, lastNet:0
+};
+const keysDown=new Set();
+
+// ---------- 방 시스템 ----------
+async function createRoom(type="normal"){
+  if(!firebaseReady){startLocalRoom(type);return}
+  const code=randomCode(); const roomRef=db.collection("rooms").doc(code);
+  const data={code,type,status:"waiting",host:me.uid,maxPlayers:type==="ai"?4:6,createdAt:firebase.firestore.FieldValue.serverTimestamp(),startedAt:null,phase:"day"};
+  await roomRef.set(data);
+  roomId=code; state.room=data; await roomRef.collection("players").doc(me.uid).set({name:"플레이어",role:"survivor",ready:true,ai:false,x:576,y:360,floor:1,room:2,hp:100,alive:true,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  listenRoom();show("lobby");notice("");
+}
+function startLocalRoom(type){
+  roomId=randomCode();state.room={code:roomId,type,status:"waiting",host:"local",maxPlayers:type==="ai"?4:6};state.players={local:{name:"나",role:"survivor",ai:false}};renderLobby();show("lobby");
+}
+async function joinRoom(code){
+  code=String(code).trim(); if(!/^\d{6}$/.test(code)){notice("6자리 방 번호를 입력하세요.");return}
+  if(!firebaseReady){notice("Firebase 설정 후 실제 방 입장이 가능합니다.");return}
+  const ref=db.collection("rooms").doc(code), snap=await ref.get();
+  if(!snap.exists){notice("존재하지 않는 방입니다.");return}
+  const r=snap.data(); if(r.status!=="waiting"){notice("이미 시작된 방입니다.");return}
+  const ps=await ref.collection("players").get(); if(ps.size>=r.maxPlayers){notice("방이 가득 찼습니다.");return}
+  roomId=code;state.room=r;
+  await ref.collection("players").doc(me.uid).set({name:"플레이어",role:"survivor",ready:true,ai:false,x:576,y:360,floor:1,room:2,hp:100,alive:true,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  listenRoom();show("lobby");notice("");
+}
+function listenRoom(){
+  if(unsubRoom)unsubRoom(); if(unsubPlayers)unsubPlayers();
+  const ref=db.collection("rooms").doc(roomId);
+  unsubRoom=ref.onSnapshot(s=>{if(!s.exists){leaveToMenu();return}state.room={code:s.id,...s.data()};if(state.room.status==="playing"&&state.mode!=="game")startGameFromRoom();renderLobby();});
+  unsubPlayers=ref.collection("players").onSnapshot(s=>{state.players={};s.forEach(d=>state.players[d.id]={id:d.id,...d.data()});renderLobby();syncRemotePlayers();});
+}
+function renderLobby(){
+  if(!state.room)return; $("lobbyInfo").innerHTML=`<b>방 번호: ${state.room.code}</b><div class="small">${state.room.type==="ai"?"AI 방":"일반 방"} · 최대 ${state.room.maxPlayers}명 · 방장: ${state.room.host==="local"?"나":state.room.host}</div>`;
+  const arr=Object.values(state.players);$("players").innerHTML=arr.map(p=>`<div class="player"><span>${p.name||"플레이어"} ${p.ai?"🤖":""}</span><span class="tag">${p.role==="zombie"?"좀비":"생존자"}${p.id===state.room.host?" · 방장":""}</span></div>`).join("");
+  $("startBtn").disabled=state.room.host!=="local"&&firebaseReady&&state.room.host!==me?.uid;
+}
+async function startRoom(){
+  if(!roomId)return;
+  if(!firebaseReady){state.room.status="playing";startGameFromRoom();return}
+  if(state.room.host!==me.uid){lobbyNotice("방장만 시작할 수 있습니다.");return}
+  const snap=await db.collection("rooms").doc(roomId).collection("players").get();
+  const arr=snap.docs.map(d=>({id:d.id,...d.data()}));
+  // 역할은 기본적으로 1:2 정도가 되도록 첫 플레이어를 좀비, 나머지는 생존자.
+  if(arr.length>1){await db.collection("rooms").doc(roomId).collection("players").doc(arr[0].id).update({role:"zombie",floor:2,room:0,x:576,y:360});}
+  if(state.room.type==="ai"){
+    const need=Math.max(0,4-arr.length);for(let i=0;i<need;i++)await db.collection("rooms").doc(roomId).collection("players").doc("ai_"+i).set({name:"AI 생존자 "+(i+1),role:"survivor",ai:true,x:520+i*50,y:360,floor:1,room:2,hp:100,alive:true,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }
+  await db.collection("rooms").doc(roomId).update({status:"playing",startedAt:firebase.firestore.FieldValue.serverTimestamp(),phase:"day"});
+}
+async function leaveToMenu(){
+  if(unsubRoom)unsubRoom();if(unsubPlayers)unsubPlayers();unsubRoom=unsubPlayers=null;
+  if(firebaseReady&&roomId&&me){try{await db.collection("rooms").doc(roomId).collection("players").doc(me.uid).delete()}catch(e){}}
+  roomId=null;state.room=null;state.mode="menu";show("menu");
+}
+
+// ---------- 게임 월드 ----------
+const W=1800,H=1000, VIEW_W=1152,VIEW_H=648, TILE=36;
+const roomsPerFloor=3;
+function roomName(r){return r===0?"서쪽 교실":r===1?"중앙 교실":"동쪽 교실"}
+function setScene(f,r){state.floor=clamp(f,1,5);state.roomNo=r;state.x=VIEW_W/2;state.y=VIEW_H/2;toast(`${state.floor}층 ${roomName(state.roomNo)}`);}
+function startGameFromRoom(){state.mode="game";state.role=(state.players[me?.uid||"local"]?.role)||"survivor";state.floor=state.role==="zombie"?2:1;state.roomNo=state.role==="zombie"?0:1;state.x=VIEW_W/2;state.y=VIEW_H/2;state.hp=100;state.alive=true;state.startedAt=state.room?.startedAt?.toMillis?.()||now();show("game");updateHud()}
+function currentSun(){return state.phase==="day" && (state.roomNo!==2 || state.floor===1)}
+function cyclePhase(){
+  const elapsed=(now()-(state.startedAt||now()))/1000; const phase=Math.floor(elapsed/180)%2===0?"day":"night";
+  state.phase=phase;
+}
+function buildObjects(){
+  const a=[];
+  // scene-specific objects. key number is spread over 10 scenes.
+  const keyScene=(state.floor-1)*2+(state.roomNo%2);
+  if(keyScene<10)a.push({type:"key",x:220+(state.roomNo*230)%600,y:250+(state.floor%2)*110,id:"k"+keyScene});
+  if(state.role==="survivor"&&state.floor===4&&state.roomNo===1)a.push({type:"antidote",x:870,y:240});
+  if(state.role==="zombie"&&state.floor===3&&state.roomNo===2)a.push({type:"medicine",x:300,y:250});
+  if(state.role==="zombie"&&state.floor===2&&state.roomNo===1)a.push({type:"umbrella",x:830,y:470});
+  return a;
+}
+function isStairZone(){return state.x>W-155&&state.y>250&&state.y<470}
+function nextRoom(dir){
+  if(dir>0&&state.roomNo<2)setScene(state.floor,state.roomNo+1);else if(dir<0&&state.roomNo>0)setScene(state.floor,state.roomNo-1);
+}
+function interact(){
+  if(!state.alive)return;
+  if(isStairZone()){
+    if(state.y<360&&state.floor<5)setScene(state.floor+1,state.roomNo); else if(state.y>=360&&state.floor>1)setScene(state.floor-1,state.roomNo); return;
+  }
+  const obj=buildObjects().find(o=>Math.hypot(o.x-state.x,o.y-state.y)<60 && (o.type!=="antidote"||state.role==="survivor") && (o.type!=="medicine"||state.role==="zombie"));
+  if(!obj){toast("가까운 상호작용 대상이 없습니다.");return}
+  if(obj.type==="key"){state.keys=Math.min(10,state.keys+1);toast(`열쇠를 찾았습니다. ${state.keys}/10`);}
+  if(obj.type==="antidote"){state.inventory.antidote=true;toast("해독제를 획득했습니다.");}
+  if(obj.type==="medicine"){state.inventory.medicine=true;toast("수상한 약을 획득했습니다. E를 다시 눌러 사용하세요.");}
+  if(obj.type==="umbrella"){state.inventory.umbrella=true;toast("우산을 획득했습니다.");}
+  if(state.role==="zombie"&&state.inventory.medicine&&!state.hulk){state.hulk=true;state.inventory.medicine=false;state.hp=180;toast("좀비가 수상한 약을 사용해 헐크로 강화되었습니다!")}
+  if(state.role==="survivor"&&state.inventory.antidote&&state.keys>=10&&state.floor===5&&state.roomNo===2&&state.x>900){toast("탈출 성공!");}
+  syncSelf();
+}
+
+// ---------- 렌더링 ----------
+const canvas=$("canvas"),ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=false;
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+function text(t,x,y,size=14,c="#fff"){ctx.fillStyle=c;ctx.font=`${size}px system-ui`;ctx.fillText(t,x,y)}
+function drawFloor(){
+  // tiled floor
+  rect(0,0,W,H,"#182133");
+  for(let y=36;y<H;y+=36)for(let x=0;x<W;x+=36){rect(x,y,34,34,(x/36+y/36)%2?"#263148":"#222c40")}
+  // walls and corridor
+  rect(0,0,W,36,"#39455e");rect(0,H-36,W,36,"#39455e");rect(0,0,36,H,"#39455e");rect(W-36,0,36,H,"#39455e");
+  rect(36,125,W-72,12,"#52617a");rect(36,H-138,W-72,12,"#52617a");
+  // classroom desks
+  for(let yy=185;yy<H-200;yy+=90)for(let xx=130;xx<W-180;xx+=150){
+    rect(xx,yy,72,30,"#8b694e");rect(xx+8,yy+8,56,6,"#b4865e");rect(xx+20,yy+31,9,22,"#59483d");rect(xx+45,yy+31,9,22,"#59483d");
+  }
+  // windows
+  for(let i=0;i<10;i++){rect(80+i*145,55,95,48,"#8cc6df");rect(84+i*145,59,42,40,"#bce8f3");rect(131+i*145,59,40,40,"#bce8f3");rect(126+i*145,55,5,48,"#5a7084")}
+  // door
+  rect(W-205,190,45,115,"#72543f");rect(W-200,196,35,109,"#986e50");rect(W-175,250,6,6,"#e6c66d");
+  // lockers / board
+  rect(45,165,55,520,"#657187");for(let y=172;y<665;y+=35)rect(50,y,45,28,"#7c899d");
+  rect(430,48,260,55,"#34415b");text(`학교 ${state.floor}층 · ${roomName(state.roomNo)}`,455,80,18,"#eaf0ff");
+  drawStairs();
+}
+function drawStairs(){
+  // visible staircase on right, real tread shapes
+  const x=W-142,y=210,w=110,h=250;rect(x,y,w,h,"#151d2b");
+  for(let i=0;i<8;i++){let yy=y+25+i*25;let xx=x+8+i*5;rect(xx,yy,w-16-i*10,18,"#9ba7b9");rect(xx,yy, w-16-i*10,4,"#d5dce7")}
+  rect(x+8,y+20,8,205,"#6f7d93");rect(x+w-16,y+20,8,205,"#6f7d93");text("↑  ↓",x+30,480,14,"#fff");
+}
+function drawObject(o){
+  if(o.type==="key"){rect(o.x-9,o.y-9,18,18,"#f0c75e");ctx.beginPath();ctx.arc(o.x,o.y,7,0,Math.PI*2);ctx.strokeStyle="#fff0a8";ctx.lineWidth=3;ctx.stroke();rect(o.x+7,o.y-2,16,4,"#f0c75e")}
+  if(o.type==="antidote"){rect(o.x-10,o.y-18,20,36,"#e9f5ff");rect(o.x-7,o.y-24,14,7,"#80a9ff");text("+",o.x-5,o.y+7,16,"#5a80e8")}
+  if(o.type==="medicine"){rect(o.x-12,o.y-18,24,36,"#c39be8");rect(o.x-8,o.y-25,16,7,"#a56bcf");text("?",o.x-5,o.y+7,16,"#fff")}
+  if(o.type==="umbrella"){ctx.strokeStyle="#d7c1f1";ctx.lineWidth=5;ctx.beginPath();ctx.arc(o.x,o.y,27,Math.PI,0);ctx.stroke();ctx.beginPath();ctx.moveTo(o.x,o.y);ctx.lineTo(o.x,o.y+28);ctx.stroke();text("우산",o.x-17,o.y+48,11,"#ddd")}
+}
+function drawCharacter(p,isMe=false){
+  if(!p.alive)return;let x=p.x||576,y=p.y||360;const zombie=p.role==="zombie";const hulk=p.hulk;
+  ctx.save();ctx.translate(Math.round(x),Math.round(y));
+  const s=hulk?1.35:1;
+  // shadow
+  ctx.fillStyle="#0008";ctx.beginPath();ctx.ellipse(0,22*s,18*s,7*s,0,0,Math.PI*2);ctx.fill();
+  // legs
+  rect(-11*s,8*s,8*s,18*s,zombie?"#29362e":"#28354e");rect(3*s,8*s,8*s,18*s,zombie?"#29362e":"#28354e");
+  // body
+  rect(-15*s,-10*s,30*s,24*s,zombie?(hulk?"#567d42":"#4f6c51"):"#4e78b7");
+  rect(-11*s,-7*s,22*s,17*s,zombie?(hulk?"#739e55":"#69886b"):"#6d9ad9");
+  // head
+  ctx.fillStyle=zombie?(hulk?"#7ea85d":"#78947b"):"#f1c5a5";ctx.beginPath();ctx.arc(0,-23*s,13*s,0,Math.PI*2);ctx.fill();
+  // hair/face
+  rect(-11*s,-35*s,22*s,7*s,zombie?"#28362d":"#352b2b");rect(-7*s,-23*s,4*s,4*s,"#222");rect(4*s,-23*s,4*s,4*s,zombie?"#d83f4d":"#222");
+  if(hulk){rect(-23,-8,8,22,"#668c4d");rect(15,-8,8,22,"#668c4d");}
+  ctx.restore();
+  // HP bar
+  const hp=p.hp??100,max=hulk?180:100;rect(x-24,y-49,48,5,"#111");rect(x-23,y-48,46*clamp(hp/max,0,1),3,zombie?"#d95c61":"#62d88a");
+}
+function getCamera(){
+  return {
+    x:clamp(state.x-VIEW_W/2,0,Math.max(0,W-VIEW_W)),
+    y:clamp(state.y-VIEW_H/2,0,Math.max(0,H-VIEW_H))
+  };
+}
+function drawScene(){
+  const cam=getCamera();
+  ctx.save();
+  ctx.clearRect(0,0,VIEW_W,VIEW_H);
+  ctx.translate(-cam.x,-cam.y);
+  drawFloor();buildObjects().forEach(drawObject);
+  const meP={x:state.x,y:state.y,hp:state.hp,role:state.role,alive:state.alive,hulk:state.hulk};drawCharacter(meP,true);
+  Object.values(state.players).filter(p=>p.id!==me?.uid&&!p.ai).forEach(p=>{if(p.floor===state.floor&&p.room===state.roomNo)drawCharacter(p)});
+  Object.values(state.players).filter(p=>p.ai&&p.floor===state.floor&&p.room===state.roomNo).forEach(p=>drawCharacter(p));
+  const radius=(state.phase==="day"?300:190)*(state.role==="zombie"?.72:1);
+  if(state.role==="zombie"){ctx.fillStyle="rgba(90,15,25,.38)";ctx.fillRect(cam.x,cam.y,VIEW_W,VIEW_H);}
+  const g=ctx.createRadialGradient(state.x,state.y,30,state.x,state.y,radius);
+  g.addColorStop(0,"rgba(0,0,0,0)");
+  g.addColorStop(.7,"rgba(0,0,0,.05)");
+  g.addColorStop(1,"rgba(0,0,0,.88)");
+  ctx.fillStyle=g;ctx.fillRect(cam.x,cam.y,VIEW_W,VIEW_H);
+  ctx.restore();
+}
+function render(){cyclePhase();drawScene();updateHud();requestAnimationFrame(render)}
+
+// ---------- 입력 ----------
+function move(dt){
+  if(!state.alive)return;
+  let dx=0,dy=0;
+  if(keysDown.has("ArrowLeft")||keysDown.has("a"))dx--;
+  if(keysDown.has("ArrowRight")||keysDown.has("d"))dx++;
+  if(keysDown.has("ArrowUp")||keysDown.has("w"))dy--;
+  if(keysDown.has("ArrowDown")||keysDown.has("s"))dy++;
+  if(!dx&&!dy)return;
+  const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+  let speed=state.role==="zombie"?(state.keys>=10?330:270):300;
+  if(state.hulk)speed=360;
+  state.x=clamp(state.x+dx*speed*dt,60,W-60);
+  state.y=clamp(state.y+dy*speed*dt,75,H-75);
+  if(state.x>W-70&&state.roomNo<2){nextRoom(1);state.x=90}
+  if(state.x<45&&state.roomNo>0){nextRoom(-1);state.x=W-90}
+  syncSelfThrottled();
+}
+let lastFrame=performance.now();function loop(t){const dt=Math.min(.05,(t-lastFrame)/16.67);lastFrame=t;move(dt);requestAnimationFrame(loop)}
+window.addEventListener("keydown",e=>{keysDown.add(e.key);if(e.key.toLowerCase()==="e")interact();if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault()});window.addEventListener("keyup",e=>keysDown.delete(e.key));
+document.querySelectorAll("[data-key]").forEach(b=>{b.addEventListener("pointerdown",()=>keysDown.add(b.dataset.key));b.addEventListener("pointerup",()=>keysDown.delete(b.dataset.key));b.addEventListener("pointerleave",()=>keysDown.delete(b.dataset.key));});
+$("interactBtn").onclick=interact;$("exitGameBtn").onclick=leaveToMenu;
+$("createBtn").onclick=()=>createRoom("normal");$("aiBtn").onclick=()=>createRoom("ai");$("joinBtn").onclick=()=>$("joinBox").classList.toggle("hidden");$("joinCodeBtn").onclick=()=>joinRoom($("roomCode").value);$("randomBtn").onclick=randomMatch;$("startBtn").onclick=startRoom;$("leaveBtn").onclick=leaveToMenu;
+
+async function randomMatch(){
+  if(!firebaseReady){notice("Firebase 설정 후 랜덤 매칭을 사용할 수 있습니다.");return}
+  notice("빈 대기방을 찾는 중...");const q=await db.collection("rooms").where("status","==","waiting").limit(10).get();
+  let chosen=null; q.forEach(d=>{if(!chosen&&d.data().type==="normal")chosen=d.id});
+  if(chosen)await joinRoom(chosen);else await createRoom("normal");
+}
+
+// ---------- Firestore 동기화 ----------
+let syncTimer=0;
+function syncSelfThrottled(){if(now()-syncTimer<120)return;syncTimer=now();syncSelf()}
+async function syncSelf(){
+  if(!firebaseReady||!roomId||!me||state.mode!=="game")return;
+  try{await db.collection("rooms").doc(roomId).collection("players").doc(me.uid).update({x:Math.round(state.x),y:Math.round(state.y),floor:state.floor,room:state.roomNo,hp:state.hp,alive:state.alive,hulk:state.hulk,keys:state.keys,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
+}
+function syncRemotePlayers(){
+  if(state.mode!=="game")return;
+  const meP=state.players[me?.uid];if(meP){state.role=meP.role;state.floor=meP.floor||state.floor;state.roomNo=meP.room||state.roomNo;}
+}
+
+function updateHud(){
+  $("roleBadge").textContent=state.hulk?"헐크":(state.role==="zombie"?"좀비":"생존자");$("floorBadge").textContent=`${state.floor}층 · ${roomName(state.roomNo)}`;$("hpBadge").textContent=`HP ${Math.max(0,Math.round(state.hp))}`;$("keyBadge").textContent=`열쇠 ${state.keys}/10`;$("timeBadge").textContent=state.phase==="day"?"☀ 낮":"☾ 밤";
+  const shade=$("shade");shade.style.background=state.role==="zombie"?"rgba(100,10,20,.10)":"transparent";
+  const mm=[];for(let f=5;f>=1;f--){let cells="";for(let r=0;r<3;r++){cells+=`<div class="room-cell ${f===state.floor&&r===state.roomNo?"on you":""}"></div>`}mm.push(`<div class="floor-row"><i>${f}F</i>${cells}</div>`)}$("minimap").innerHTML=mm.join("");
+  $("inventory").innerHTML=[state.inventory.antidote?"💊":"",state.inventory.medicine?"🧪":"",state.inventory.umbrella?"☂":"",...Array(7).fill("")].map((x,i)=>`<div class="slot"><b>${x||"·"}</b><span>${i===0&&state.inventory.antidote?"해독제":i===1&&state.inventory.medicine?"수상한 약":i===2&&state.inventory.umbrella?"우산":""}</span></div>`).join("");
+}
+function toast(s){const t=$("toast");t.textContent=s;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),1800)}
+
+// local AI demo behavior
+setInterval(()=>{
+  if(state.mode!=="game")return;
+  for(const p of Object.values(state.players)){if(!p.ai)continue;p.floor=state.floor;p.room=state.roomNo;p.x=clamp((p.x||520)+(state.x-(p.x||520))*.04,60,1080);p.y=clamp((p.y||360)+(state.y-(p.y||360))*.04,75,570);p.hp=100;p.alive=true;}
+  if(state.role==="zombie"&&currentSun()&&!state.inventory.umbrella){state.hp-=1;if(state.hp<=0){state.alive=false;state.respawnAt=now()+60000;toast("햇빛에 노출되어 쓰러졌습니다. 60초 후 급식실에서 재생성됩니다.");}}
+  if(!state.alive&&now()>=state.respawnAt){state.alive=true;state.hp=state.hulk?180:100;state.floor=2;state.roomNo=0;state.x=576;state.y=360;toast("급식실에서 다시 시작합니다.");}
+  syncSelfThrottled();
+},1000);
+
+// initial local preview is intentionally playable without Firebase.
+state.mode="menu";renderLobby();requestAnimationFrame(loop);requestAnimationFrame(render);
+</script>
+</body>
+</html>
